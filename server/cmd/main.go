@@ -5,6 +5,7 @@ import (
 
 	"github.com/yogesh/chat/db"
 	"github.com/yogesh/chat/internal/user"
+	"github.com/yogesh/chat/internal/ws"
 	"github.com/yogesh/chat/router"
 )
 
@@ -23,6 +24,11 @@ func main() {
 	userService := user.NewService(userRep)
 	userHandler := user.NewHandler(userService)
 
-	router.InitRouter(userHandler)
+	hub := ws.NewHub()
+	wsHandler := ws.NewHandler(hub)
+
+	go hub.Run()
+
+	router.InitRouter(userHandler, wsHandler)
 	router.Start(":8080")
 }
