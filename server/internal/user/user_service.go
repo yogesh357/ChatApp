@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	secretKey = "secret"
+	secretKey = "mytoplevelsecret"
 )
 
 type service struct {
@@ -69,7 +69,7 @@ func (s *service) Login(c context.Context, req *LoginUserReq) (*LoginUserRes, er
 		return nil, err
 	}
 
-	err = util.ComparePassword(req.Password, u.Password)
+	err = util.ComparePassword(u.Password, req.Password)
 	if err != nil {
 		return &LoginUserRes{}, err
 	}
