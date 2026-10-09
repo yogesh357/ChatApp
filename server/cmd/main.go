@@ -13,6 +13,11 @@ func main() {
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
 	}
+	if err := dbConn.GetDB().Ping(); err != nil {
+		log.Fatal("Database connection failed:", err)
+	}
+
+	log.Println("Connected to PostgreSQL successfully")
 
 	userRep := user.NewRepository(dbConn.GetDB())
 	userService := user.NewService(userRep)
