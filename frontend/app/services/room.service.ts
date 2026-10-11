@@ -1,27 +1,32 @@
 import axios from "./axios"
 
-
-const createRoom = async (data: { ID: string, name: string }) => {
-    await axios.post('/ws/createRoom', data)
+export interface RoomItem {
+    id: string
+    name: string
 }
 
-const joinRoom = async (roomId: string) => {
-    await axios.get(`/ws/joinRoom/${roomId}`)
+export interface ClientItem {
+    id: string
+    username: string
 }
 
-const getRooms = async () => {
-    const res = await axios.get('/ws/getRooms')
+const createRoom = async (data: { id: string; name: string }): Promise<RoomItem> => {
+    const res = await axios.post('/ws/createRoom', data)
     return res.data
 }
 
-const getClients = async (roomId: string) => {
+const getRooms = async (): Promise<RoomItem[]> => {
+    const res = await axios.get('/ws/rooms')
+    return res.data || []
+}
+
+const getClients = async (roomId: string): Promise<ClientItem[]> => {
     const res = await axios.get(`/ws/getClients/${roomId}`)
-    return res.data
+    return res.data || []
 }
 
 export {
     createRoom,
-    joinRoom,
     getRooms,
     getClients
 }
