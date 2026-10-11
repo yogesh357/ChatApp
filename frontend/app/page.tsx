@@ -13,13 +13,19 @@ export default function Home() {
     messages,
     stats,
     sendMessage
-  } = useChatSocket(DEFAULT_WS_URL);
+  } = useChatSocket();
 
   const [message, setMessage] = useState<string>("");
 
   return (
     <main className="flex h-screen items-center justify-center">
-      <form onSubmit={() => sendMessage(message)} className="flex flex-col gap-3">
+      <form onSubmit={(e) => {
+
+        e.preventDefault()
+
+        sendMessage(message)
+      }
+      } className="flex flex-col gap-3">
 
         <input
           className="border-2 border-black rounded-2xl"
@@ -27,6 +33,6 @@ export default function Home() {
         <button className="border-2 border-gray-600 bg-blue-400 rounded-2xl" type="submit">send message</button>
       </form>
 
-    </main>
+    </main >
   );
 }

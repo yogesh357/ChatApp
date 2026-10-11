@@ -4,7 +4,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../context/authProvider";
 import { ChatPayload, EventMessage } from "./types";
 
-const DEFAULT_URL = "ws://localhost:8080/wsjoinRoom/1"
+const DEFAULT_URL = "ws://localhost:8080/ws/joinRoom/1?userId=1&username=yogesh"
 
 
 export interface ServerStats {
@@ -48,16 +48,15 @@ export function useChatSocket(
     });
 
 
-    const ws = new WebSocket(serverUrl);
 
-    const socket = new WebSocket(serverUrl);
-    wsRef.current = socket;
-
-    const connectStart = Date.now();
 
     const connect = useCallback((force: boolean = false) => {
         try {
 
+            const socket = new WebSocket(serverUrl);
+            wsRef.current = socket;
+
+            const connectStart = Date.now();
             socket.onopen = () => {
                 if (wsRef.current !== socket) return;
                 setStatus("connected");
@@ -70,7 +69,7 @@ export function useChatSocket(
                 }));
             };
 
-            ws.onmessage = (message: MessageEvent) => {
+            socket.onmessage = (message: MessageEvent) => {
                 const m: Message = JSON.parse(message.data)
                 if (m.content == 'A new user has joined the room') {
                     setUsers([...users, { username: m.username }])
@@ -89,11 +88,11 @@ export function useChatSocket(
             }
 
 
-            ws.onclose = () => {
+            socket.onclose = () => {
                 console.log("WebSocket disconnected");
             }
 
-            ws.onerror = (error) => {
+            socket.onerror = (error) => {
                 console.log("WebSocket error");
             }
 
