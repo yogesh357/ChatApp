@@ -1,58 +1,75 @@
 'use client'
 
-import { useState, createContext, useEffect } from 'react'
-import { useRouter } from 'next/router'
+import React, { useState, createContext, useEffect, useContext } from 'react'
 
 export type UserInfo = {
     username: string
     id: string
 }
 
-export const AuthContext = createContext<{
+interface AuthContextType {
     authenticated: boolean
-    setAuthenticated: (auth: boolean) => void
-    user: UserInfo
-    setUser: (user: UserInfo) => void
-}>({
+    isLoading: boolean
+    user: UserInfo | null
+    login: (userInfo: UserInfo) => void
+    logout: () => Promise<void>
+}
+
+export const AuthContext = createContext<AuthContextType>({
     authenticated: false,
-    setAuthenticated: () => { },
-    user: { username: '', id: '' },
-    setUser: () => { },
+    isLoading: true,
+    user: null,
+    login: () => {},
+    logout: async () => {},
 })
 
-const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
-    const [authenticated, setAuthenticated] = useState(false)
-    const [user, setUser] = useState<UserInfo>({ username: '', id: '' })
+export const useAuth = () => useContext(AuthContext)
 
-    const router = useRouter()
+const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
+    const [user, setUser] = useState<UserInfo | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
 
     useEffect(() => {
-        const userInfo = localStorage.getItem('user_info')
-
-        if (!userInfo) {
-            if (window.location.pathname != '/signup') {
-                router.push('/login')
-                return
+        try {
+            const stored = localStorage.getItem('user_info')
+            if (stored) {
+                const parsed: UserInfo = JSON.parse(stored)
+                if (parsed?.id && parsed?.username) {
+                    setUser(parsed)
+                }
             }
-        } else {
-            const user: UserInfo = JSON.parse(userInfo)
-            if (user) {
-                setUser({
-                    username: user.username,
-                    id: user.id,
-                })
-            }
-            setAuthenticated(true)
+        } catch (e) {
+            console.error('Failed to parse user from localStorage', e)
+        } finally {
+            setIsLoading(false)
         }
-    }, [authenticated])
+    }, [])
+
+    const login = (userInfo: UserInfo) => {
+        setUser(userInfo)
+        localStorage.setItem('user_info', JSON.stringify(userInfo))
+    }
+
+    const logout = async () => {
+        try {
+            const { userLogout } = await import('../services/auth.service')
+            await userLogout().catch(() => {})
+        } catch {
+            // Ignore network errors on logout
+        } finally {
+            setUser(null)
+            localStorage.removeItem('user_info')
+        }
+    }
 
     return (
         <AuthContext.Provider
             value={{
-                authenticated: authenticated,
-                setAuthenticated: setAuthenticated,
-                user: user,
-                setUser: setUser,
+                authenticated: !!user,
+                isLoading,
+                user,
+                login,
+                logout,
             }}
         >
             {children}

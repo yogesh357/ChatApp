@@ -1,50 +1,83 @@
 'use client'
 
-import { useState } from "react";
-import ChatBox from "./components/ChatBox";
-import { useChatSocket } from "./lib/useChatSocket";
-
-const DEFAULT_WS_URL = "ws://localhost:8080";
+import React, { useState } from 'react'
+import { useAuth } from './context/authProvider'
+import Navbar from './components/Navbar'
+import AuthModal from './components/AuthModal'
+import RoomSidebar from './components/RoomSidebar'
+import ChatBox from './components/ChatBox'
 
 export default function Home() {
+    const { user, authenticated, isLoading } = useAuth()
+    const [authModalOpen, setAuthModalOpen] = useState(false)
+    const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
+    const [activeRoomName, setActiveRoomName] = useState<string | undefined>(undefined)
 
-  const {
-    status,
-    messages: wsMessages,
-    stats,
-    sendMessage
-  } = useChatSocket();
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+                    <span className="w-2 h-2 rounded-full bg-zinc-400 animate-ping" />
+                    Initializing application...
+                </div>
+            </div>
+        )
+    }
 
-  const [message, setMessage] = useState<string>("");
-  console.log("message received from server ::", message);
+    return (
+        <div className="min-h-screen bg-zinc-950 flex flex-col font-sans">
+            <Navbar onOpenAuthModal={() => setAuthModalOpen(true)} />
 
+            {!authenticated ? (
+                /* Unauthenticated State */
+                <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="max-w-md w-full bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-8 backdrop-blur-md shadow-2xl">
+                        <div className="w-12 h-12 rounded-2xl bg-zinc-800 border border-zinc-700/60 flex items-center justify-center mx-auto mb-4 text-xl">
+                            ✦
+                        </div>
+                        <h1 className="text-xl font-bold tracking-tight text-zinc-100 mb-2">
+                            Go WebSocket Chat
+                        </h1>
+                        <p className="text-xs text-zinc-400 leading-relaxed mb-6">
+                            A minimalist real-time communication platform built on high-performance Go WebSockets and Next.js.
+                        </p>
 
-  return (
-    <main className="flex h-screen items-center justify-center flex flex-col gap-3">
-      <div className="w-full h-96 border-2 border-black rounded-2xl">
-        message received from server ::
-        {wsMessages.map((message) => (
-          <>
-            <div>{message.content}</div>
-          </>
-        ))}
-      </div>
-      <form onSubmit={(e) => {
+                        <button
+                            onClick={() => setAuthModalOpen(true)}
+                            className="w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-medium text-xs py-3 rounded-xl transition-all shadow-md cursor-pointer"
+                        >
+                            Get Started / Sign In
+                        </button>
+                    </div>
 
-        e.preventDefault()
+                    <AuthModal
+                        isOpen={authModalOpen}
+                        onClose={() => setAuthModalOpen(false)}
+                    />
+                </main>
+            ) : (
+                /* Authenticated Chat Application */
+                <main className="flex-1 flex overflow-hidden">
+                    <RoomSidebar
+                        activeRoomId={activeRoomId}
+                        onSelectRoom={(id) => {
+                            setActiveRoomId(id)
+                            setActiveRoomName(`Room #${id}`)
+                        }}
+                    />
 
-        sendMessage(message)
-        console.log("message sent ::", message);
-        setMessage("")
-      }
-      } className="flex flex-col gap-3">
+                    <ChatBox
+                        roomId={activeRoomId}
+                        roomName={activeRoomName}
+                        user={user}
+                    />
 
-        <input
-          className="border-2 border-black rounded-2xl"
-          type="text" placeholder="enter message" onChange={(e) => setMessage(e.target.value)} value={message} />
-        <button className="border-2 border-gray-600 bg-blue-400 rounded-2xl" type="submit">send message</button>
-      </form>
-
-    </main >
-  );
+                    <AuthModal
+                        isOpen={authModalOpen}
+                        onClose={() => setAuthModalOpen(false)}
+                    />
+                </main>
+            )}
+        </div>
+    )
 }

@@ -1,153 +1,123 @@
 'use client'
 
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
-import { AuthContext } from "../context/authProvider";
-import { ChatPayload, EventMessage } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { UserInfo } from "../context/authProvider";
 
-const DEFAULT_URL = "ws://localhost:8080/ws/joinRoom/1?userId=1&username=yogesh"
+export type ConnectionStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
 
-
-export interface ServerStats {
-    messagesSent: number;
-    messagesReceived: number;
-    connectedAt: number | null;
-    latencyMs: number | null;
-    poolSize?: number;
-    assignedClientId?: string | null;
+export interface ChatMessage {
+    id: string;
+    content: string;
+    roomId: string;
+    username: string;
+    timestamp: number;
+    isSystem: boolean;
+    isSelf: boolean;
 }
-export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
-
-
-export type Message = {
-    content: string
-    client_id: string
-    username: string
-    room_id: string
-    type: 'recv' | 'self'
-}
-
 
 export function useChatSocket(
-    serverUrl: string = DEFAULT_URL
+    roomId: string | null,
+    user: UserInfo | null
 ) {
-
     const wsRef = useRef<WebSocket | null>(null);
-    const [status, setStatus] = useState<ConnectionStatus>("connecting");
-    const { user } = useContext(AuthContext)
-    const [users, setUsers] = useState<Array<{ username: string }>>([])
-    const [messages, setMessage] = useState<Array<Message>>([])
+    const [status, setStatus] = useState<ConnectionStatus>("idle");
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-
-    const [stats, setStats] = useState<ServerStats>({
-        messagesSent: 0,
-        messagesReceived: 0,
-        connectedAt: null,
-        latencyMs: null,
-        poolSize: 1,
-        assignedClientId: null,
-    });
-
-
-
-
-    const connect = useCallback((force: boolean = false) => {
-        try {
-
-            const socket = new WebSocket(serverUrl);
-            wsRef.current = socket;
-
-            const connectStart = Date.now();
-            socket.onopen = () => {
-                if (wsRef.current !== socket) return;
-                setStatus("connected");
-                const latency = Date.now() - connectStart;
-
-                setStats((prev) => ({
-                    ...prev,
-                    connectedAt: Date.now(),
-                    latencyMs: latency,
-                }));
-            };
-
-            socket.onmessage = (message: MessageEvent) => {
-                const m: Message = JSON.parse(message.data)
-                if (m.content == 'A new user has joined the room') {
-                    setUsers([...users, { username: m.username }])
-                }
-
-                if (m.content == 'user left the chat') {
-                    const deleteUser = users.filter((user) => user.username != m.username)
-                    setUsers([...deleteUser])
-                    setMessage([...messages, m])
-                    return
-                }
-
-                user?.username == m.username ? (m.type = 'self') : (m.type = 'recv')
-                setMessage([...messages, m])
-
-            }
-
-
-            socket.onclose = () => {
-                console.log("WebSocket disconnected");
-            }
-
-            socket.onerror = (error) => {
-                console.log("WebSocket error");
-            }
-
-
-        } catch (err) {
-            console.error("WebSocket connection failure:", err);
-            setStatus("error");
-        }
-    }, [serverUrl])
+    // Clear messages when roomId changes
+    useEffect(() => {
+        setMessages([]);
+    }, [roomId]);
 
     useEffect(() => {
-        connect()
-    }, [connect])
+        if (!roomId || !user?.id || !user?.username) {
+            setStatus("idle");
+            return;
+        }
 
+        const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
+        const clientConnId = `${user.id}_${Math.random().toString(36).substring(2, 8)}`;
+        const wsUrl = `${wsBase}/ws/joinRoom/${encodeURIComponent(roomId)}?userId=${encodeURIComponent(clientConnId)}&username=${encodeURIComponent(user.username)}`;
+
+        setStatus("connecting");
+        const socket = new WebSocket(wsUrl);
+        wsRef.current = socket;
+
+        socket.onopen = () => {
+            if (wsRef.current === socket) {
+                setStatus("connected");
+            }
+        };
+
+        socket.onmessage = (event: MessageEvent) => {
+            try {
+                const raw = JSON.parse(event.data);
+                const content: string = raw.content || "";
+                const msgRoomId: string = raw.roomId || roomId;
+                const senderUsername: string = raw.username || "System";
+
+                const isJoin = content.toLowerCase().includes("has joined the room");
+                const isLeave = content.toLowerCase().includes("left the chat");
+                const isSystem = isJoin || isLeave;
+
+                const newMsg: ChatMessage = {
+                    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    content,
+                    roomId: msgRoomId,
+                    username: senderUsername,
+                    timestamp: Date.now(),
+                    isSystem,
+                    isSelf: senderUsername === user.username,
+                };
+
+                setMessages((prev) => [...prev, newMsg]);
+            } catch (err) {
+                console.error("Failed to parse incoming WebSocket message:", err, event.data);
+            }
+        };
+
+        socket.onclose = (event) => {
+            if (wsRef.current === socket) {
+                // If it wasn't a normal clean closure initiated by unmount
+                if (event.code !== 1000) {
+                    setStatus("disconnected");
+                }
+            }
+        };
+
+        socket.onerror = () => {
+            if (wsRef.current === socket) {
+                setStatus("error");
+            }
+        };
+
+        return () => {
+            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+                socket.close(1000, "Component unmounted or room changed");
+            }
+            if (wsRef.current === socket) {
+                wsRef.current = null;
+            }
+        };
+    }, [roomId, user?.id, user?.username]);
 
     const sendMessage = useCallback((text: string): boolean => {
         const trimmed = text.trim();
-        console.log("input text to send the message received :", text);
+        if (!trimmed) return false;
 
-        if (!trimmed || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        const socket = wsRef.current;
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+            console.warn("WebSocket is not open. Current state:", socket?.readyState);
             return false;
         }
 
-        const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-        // Send Structured Event Message
-        const eventPayload: EventMessage<ChatPayload> = {
-            event: "CHAT_MESSAGE",
-            payload: {
-                id: msgId || "1001",
-                sender: "sender",
-                text: trimmed || "hello",
-                timestamp: Date.now(),
-            },
-        };
-
-        console.log("event payload::", eventPayload);
-
-
-        wsRef.current.send(JSON.stringify(eventPayload));
-        console.log("message sent successfully");
-
-        setStats((prev) => ({
-            ...prev,
-            messagesSent: prev.messagesSent + 1,
-        }));
-
+        // Send raw text - the Go backend receives string(m) and wraps it in Message struct
+        socket.send(trimmed);
         return true;
     }, []);
 
     return {
         status,
         messages,
-        stats,
         sendMessage,
     };
 }
-
