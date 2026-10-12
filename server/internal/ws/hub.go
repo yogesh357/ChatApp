@@ -1,5 +1,9 @@
 package ws
 
+import (
+	"context"
+)
+
 type Room struct {
 	ID      string             `json:"id"`
 	Name    string             `json:"name"`
@@ -11,6 +15,12 @@ type Hub struct {
 	Register   chan *Client
 	Unregister chan *Client
 	Broadcast  chan *Message
+}
+
+type Repository interface {
+	CreateRoom(ctx context.Context, req *CreateRoomReq) (*CreateRoomRes, error)
+	GetRooms(ctx context.Context)
+	GetClients(ctx context.Context)
 }
 
 func NewHub() *Hub {

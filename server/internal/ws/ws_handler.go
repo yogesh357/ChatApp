@@ -9,15 +9,21 @@ import (
 
 type Handler struct {
 	hub *Hub
+	Repository
 }
 
-func NewHandler(h *Hub) *Handler {
+func NewHandler(h *Hub, repository Repository) *Handler {
 	return &Handler{
-		hub: h,
+		hub:        h,
+		Repository: repository,
 	}
 }
 
 type CreateRoomReq struct {
+	// ID   string `json:"id"`
+	Name string `json:"name"`
+}
+type CreateRoomRes struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
@@ -29,12 +35,19 @@ func (h *Handler) CreateRoom(c *gin.Context) {
 		return
 	}
 
-	h.hub.Rooms[req.ID] = &Room{
-		ID:      req.ID,
-		Name:    req.Name,
-		Clients: make(map[string]*Client),
+	// h.hub.Rooms[req.ID] = &Room{
+	// 	ID:      req.ID,
+	// 	Name:    req.Name,
+	// 	Clients: make(map[string]*Client),
+	// }
+
+	res, err := h.Repository.CreateRoom(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-	c.JSON(http.StatusOK, req)
+
+	c.JSON(http.StatusOK, res)
 }
 
 var upgrader = websocket.Upgrader{

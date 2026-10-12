@@ -24,8 +24,9 @@ func main() {
 	userService := user.NewService(userRep)
 	userHandler := user.NewHandler(userService)
 
+	wsRepository := ws.NewRepository(dbConn.GetDB())
 	hub := ws.NewHub()
-	wsHandler := ws.NewHandler(hub)
+	wsHandler := ws.NewHandler(hub, wsRepository)
 
 	go hub.Run()
 
