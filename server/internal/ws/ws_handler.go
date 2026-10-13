@@ -39,14 +39,12 @@ func (h *Handler) CreateRoom(c *gin.Context) {
 		return
 	}
 
+	// userId MUST come from the validated JWT claims set by middleware.
+	// No query param fallback — middleware already ran and rejected unauthenticated requests.
 	userID := c.GetString("userId")
 	if userID == "" {
-		// Fallback if auth middleware is bypassed or optional
-		userID = c.Query("userId")
-		if userID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user identification required"})
-			return
-		}
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
 	}
 
 	room, err := h.Repository.CreateRoom(c.Request.Context(), req.Name, userID)
@@ -71,21 +69,25 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// JoinRoom upgrades the HTTP connection to a WebSocket.
+//
+// Authentication: The middleware (Authenticate) already ran and validated the JWT.
+// For browser WebSocket connections, the token must be sent as ?token=<jwt> query param
+// because browsers cannot set custom headers on WebSocket handshakes.
+//
+// Correct connection URL: ws://host/ws/joinRoom/<roomId>?token=<accessToken>
 func (h *Handler) JoinRoom(c *gin.Context) {
 	roomID := c.Param("roomId")
+
+	// Read identity strictly from the JWT claims injected by the Authenticate middleware.
+	// These will only be non-empty if a valid token was presented.
 	userID := c.GetString("userId")
 	username := c.GetString("username")
 
-	// Allow query param fallbacks for WebSocket handshakes
-	if userID == "" {
-		userID = c.Query("userId")
-	}
-	if username == "" {
-		username = c.Query("username")
-	}
-
-	if roomID == "" || userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "roomId and userId are required"})
+	if userID == "" || roomID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "authentication required — send JWT as ?token=<accessToken> query param",
+		})
 		return
 	}
 

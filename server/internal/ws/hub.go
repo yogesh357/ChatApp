@@ -53,7 +53,10 @@ func (h *Hub) Run() {
 
 		case cl := <-h.Unregister:
 			if r, ok := h.Rooms[cl.RoomID]; ok {
-				if _, exists := r.Clients[cl.ID]; exists {
+				// Guard: only act if this exact client pointer is still registered.
+				// If Register already evicted and replaced this client with a new one,
+				// its Message channel was already closed — closing it again would panic.
+				if current, exists := r.Clients[cl.ID]; exists && current == cl {
 					delete(r.Clients, cl.ID)
 					close(cl.Message)
 

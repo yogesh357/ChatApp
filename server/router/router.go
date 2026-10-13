@@ -26,7 +26,8 @@ func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 
 	// Room and WebSocket endpoints (supports Header, Query token, and Cookie)
 	wsGroup := r.Group("/ws")
-	wsGroup.Use(middleware.AuthenticateOptional())
+	// wsGroup.Use(middleware.AuthenticateOptional())
+	wsGroup.Use(middleware.Authenticate())
 	{
 		wsGroup.POST("/createRoom", wsHandler.CreateRoom)
 		wsGroup.GET("/rooms", wsHandler.GetRooms)
