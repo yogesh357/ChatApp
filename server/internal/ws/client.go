@@ -2,6 +2,8 @@ package ws
 
 import (
 	"log"
+	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,9 +17,12 @@ type Client struct {
 }
 
 type Message struct {
-	Content  string `json:"content"`
-	RoomID   string `json:"roomId"`
-	Username string `json:"username"`
+	ID        string    `json:"id,omitempty"`
+	Content   string    `json:"content"`
+	RoomID    string    `json:"roomId"`
+	SenderID  string    `json:"senderId,omitempty"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"createdAt,omitempty"`
 }
 
 func (c *Client) writeMessage() {
@@ -28,32 +33,41 @@ func (c *Client) writeMessage() {
 	for {
 		message, ok := <-c.Message
 		if !ok {
-			// c.Conn.WriteJSON(websocket.FormatCloseMessage(websocket.CloseMessage, ""))
 			return
 		}
 
-		c.Conn.WriteJSON(message)
+		if err := c.Conn.WriteJSON(message); err != nil {
+			return
+		}
 	}
 }
 
 func (c *Client) readMessage(hub *Hub) {
 	defer func() {
+		hub.Unregister <- c
 		c.Conn.Close()
 	}()
 
 	for {
 		_, m, err := c.Conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("websocket read error: %v", err)
 			}
 			break
 		}
 
+		trimmed := strings.TrimSpace(string(m))
+		if trimmed == "" {
+			continue
+		}
+
 		msg := &Message{
-			Content:  string(m),
-			RoomID:   c.RoomID,
-			Username: c.Username,
+			Content:   trimmed,
+			RoomID:    c.RoomID,
+			SenderID:  c.ID,
+			Username:  c.Username,
+			CreatedAt: time.Now(),
 		}
 
 		hub.Broadcast <- msg
