@@ -18,8 +18,11 @@ export interface LoginReq {
 }
 
 export interface LoginRes {
+    accessToken: string
+    refreshToken: string
     id: string
     username: string
+    email?: string
 }
 
 const userRegister = async (data: RegisterReq): Promise<RegisterRes> => {

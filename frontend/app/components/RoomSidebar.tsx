@@ -5,7 +5,7 @@ import { RoomItem, ClientItem, getRooms, createRoom, getClients } from '../servi
 
 interface RoomSidebarProps {
     activeRoomId: string | null
-    onSelectRoom: (roomId: string) => void
+    onSelectRoom: (roomId: string, roomName?: string) => void
     refreshTrigger?: number
 }
 
@@ -21,7 +21,6 @@ export default function RoomSidebar({
     const [showCreate, setShowCreate] = useState(false)
 
     // New room form state
-    const [newRoomId, setNewRoomId] = useState('')
     const [newRoomName, setNewRoomName] = useState('')
     const [creating, setCreating] = useState(false)
     const [createError, setCreateError] = useState<string | null>(null)
@@ -65,22 +64,22 @@ export default function RoomSidebar({
         e.preventDefault()
         setCreateError(null)
 
-        const id = newRoomId.trim()
         const name = newRoomName.trim()
 
-        if (!id || !name) {
-            setCreateError('Please enter both Room ID and Room Name')
+        if (!name) {
+            setCreateError('Please enter a room name')
             return
         }
 
         try {
             setCreating(true)
-            await createRoom({ id, name })
-            setNewRoomId('')
+            const room = await createRoom({ name })
             setNewRoomName('')
             setShowCreate(false)
             await fetchRooms()
-            onSelectRoom(id)
+            if (room?.id) {
+                onSelectRoom(room.id, room.name)
+            }
         } catch (err: any) {
             console.error('Error creating room', err)
             setCreateError(err.response?.data?.error || 'Failed to create room')
@@ -133,21 +132,15 @@ export default function RoomSidebar({
                         )}
                         <input
                             type="text"
-                            placeholder="Room ID (e.g. 1, dev, general)"
-                            value={newRoomId}
-                            onChange={(e) => setNewRoomId(e.target.value)}
-                            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
-                        />
-                        <input
-                            type="text"
-                            placeholder="Room Name (e.g. Go Developers)"
+                            placeholder="Room Name (e.g. Go Developers, General)"
                             value={newRoomName}
                             onChange={(e) => setNewRoomName(e.target.value)}
                             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                            autoFocus
                         />
                         <button
                             type="submit"
-                            disabled={creating}
+                            disabled={creating || !newRoomName.trim()}
                             className="w-full py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-xs font-medium rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                         >
                             {creating ? 'Creating...' : 'Create & Join'}
@@ -181,12 +174,11 @@ export default function RoomSidebar({
                         return (
                             <button
                                 key={room.id}
-                                onClick={() => onSelectRoom(room.id)}
-                                className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between cursor-pointer border ${
-                                    isActive
-                                        ? 'bg-zinc-900 border-zinc-700/80 text-zinc-100 shadow-sm'
-                                        : 'bg-transparent border-transparent text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200'
-                                }`}
+                                onClick={() => onSelectRoom(room.id, room.name)}
+                                className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between cursor-pointer border ${isActive
+                                    ? 'bg-zinc-900 border-zinc-700/80 text-zinc-100 shadow-sm'
+                                    : 'bg-transparent border-transparent text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200'
+                                    }`}
                             >
                                 <div className="truncate">
                                     <div className="text-xs font-medium truncate text-zinc-200">
