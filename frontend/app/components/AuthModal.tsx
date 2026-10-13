@@ -34,16 +34,22 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 }
 
                 // Register user
-                const registered = await userRegister({
+                await userRegister({
                     username: username.trim(),
                     email: email.trim(),
                     password: password.trim(),
                 })
 
-                // Auto login or switch to login
+                // Immediately login to receive access token and session cookies
+                const res = await userLogin({
+                    email: email.trim(),
+                    password: password.trim(),
+                })
+
                 login({
-                    id: registered.id,
-                    username: registered.username,
+                    id: res.id,
+                    username: res.username,
+                    accessToken: res.accessToken,
                 })
                 onClose?.()
             } else {
@@ -61,6 +67,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 login({
                     id: res.id,
                     username: res.username,
+                    accessToken: res.accessToken,
                 })
                 onClose?.()
             }

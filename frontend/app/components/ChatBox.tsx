@@ -11,7 +11,7 @@ interface ChatBoxProps {
 }
 
 export default function ChatBox({ roomId, roomName, user }: ChatBoxProps) {
-    const { status, messages, sendMessage } = useChatSocket(roomId, user)
+    const { status, messages, loadingHistory, sendMessage } = useChatSocket(roomId, user)
     const [input, setInput] = useState('')
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -98,7 +98,12 @@ export default function ChatBox({ roomId, roomName, user }: ChatBoxProps) {
 
             {/* Messages Scroll Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {messages.length === 0 ? (
+                {loadingHistory ? (
+                    <div className="text-center py-20 text-xs text-zinc-500 font-mono flex items-center justify-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+                        Loading conversation history...
+                    </div>
+                ) : messages.length === 0 ? (
                     <div className="text-center py-20 text-xs text-zinc-500">
                         {status === 'connected'
                             ? 'Room is ready. Send a message to start the conversation!'

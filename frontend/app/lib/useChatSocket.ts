@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UserInfo } from "../context/authProvider";
+import { getMessages, MessageRecord } from "../services/room.service";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
 
@@ -22,12 +23,48 @@ export function useChatSocket(
     const wsRef = useRef<WebSocket | null>(null);
     const [status, setStatus] = useState<ConnectionStatus>("idle");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
 
-    // Clear messages when roomId changes
+    // Fetch historical messages from PostgreSQL when roomId changes
     useEffect(() => {
-        setMessages([]);
-    }, [roomId]);
+        if (!roomId || !user?.username) {
+            setMessages([]);
+            setLoadingHistory(false);
+            return;
+        }
 
+        let isCancelled = false;
+        setLoadingHistory(true);
+
+        getMessages(roomId, 50)
+            .then((records: MessageRecord[]) => {
+                if (isCancelled) return;
+                const historical: ChatMessage[] = (records || []).map((rec) => ({
+                    id: rec.id,
+                    content: rec.content,
+                    roomId: rec.roomId,
+                    username: rec.username,
+                    timestamp: rec.createdAt ? new Date(rec.createdAt).getTime() : Date.now(),
+                    isSystem: false,
+                    isSelf: rec.username === user.username,
+                }));
+                setMessages(historical);
+            })
+            .catch((err) => {
+                console.error("Failed to load message history:", err);
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setLoadingHistory(false);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [roomId, user?.username]);
+
+    // WebSocket connection lifecycle
     useEffect(() => {
         if (!roomId || !user?.id || !user?.username) {
             setStatus("idle");
@@ -35,8 +72,8 @@ export function useChatSocket(
         }
 
         const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
-        const clientConnId = `${user.id}_${Math.random().toString(36).substring(2, 8)}`;
-        const wsUrl = `${wsBase}/ws/joinRoom/${encodeURIComponent(roomId)}?userId=${encodeURIComponent(clientConnId)}&username=${encodeURIComponent(user.username)}`;
+        const tokenParam = user.accessToken ? `?token=${encodeURIComponent(user.accessToken)}` : "";
+        const wsUrl = `${wsBase}/ws/joinRoom/${encodeURIComponent(roomId)}${tokenParam}`;
 
         setStatus("connecting");
         const socket = new WebSocket(wsUrl);
@@ -59,17 +96,26 @@ export function useChatSocket(
                 const isLeave = content.toLowerCase().includes("left the chat");
                 const isSystem = isJoin || isLeave;
 
+                const msgId = raw.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                const timestamp = raw.createdAt ? new Date(raw.createdAt).getTime() : Date.now();
+
                 const newMsg: ChatMessage = {
-                    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    id: msgId,
                     content,
                     roomId: msgRoomId,
                     username: senderUsername,
-                    timestamp: Date.now(),
+                    timestamp,
                     isSystem,
                     isSelf: senderUsername === user.username,
                 };
 
-                setMessages((prev) => [...prev, newMsg]);
+                setMessages((prev) => {
+                    // Prevent duplicate if ID is already in messages
+                    if (prev.some((m) => m.id === newMsg.id)) {
+                        return prev;
+                    }
+                    return [...prev, newMsg];
+                });
             } catch (err) {
                 console.error("Failed to parse incoming WebSocket message:", err, event.data);
             }
@@ -77,7 +123,6 @@ export function useChatSocket(
 
         socket.onclose = (event) => {
             if (wsRef.current === socket) {
-                // If it wasn't a normal clean closure initiated by unmount
                 if (event.code !== 1000) {
                     setStatus("disconnected");
                 }
@@ -98,7 +143,7 @@ export function useChatSocket(
                 wsRef.current = null;
             }
         };
-    }, [roomId, user?.id, user?.username]);
+    }, [roomId, user?.id, user?.username, user?.accessToken]);
 
     const sendMessage = useCallback((text: string): boolean => {
         const trimmed = text.trim();
@@ -110,7 +155,7 @@ export function useChatSocket(
             return false;
         }
 
-        // Send raw text - the Go backend receives string(m) and wraps it in Message struct
+        // Send raw text string - backend receives string(m) and wraps it
         socket.send(trimmed);
         return true;
     }, []);
@@ -118,6 +163,7 @@ export function useChatSocket(
     return {
         status,
         messages,
+        loadingHistory,
         sendMessage,
     };
 }

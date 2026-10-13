@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from './context/authProvider'
 import Navbar from './components/Navbar'
 import AuthModal from './components/AuthModal'
@@ -12,6 +12,34 @@ export default function Home() {
     const [authModalOpen, setAuthModalOpen] = useState(false)
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null)
     const [activeRoomName, setActiveRoomName] = useState<string | undefined>(undefined)
+
+    // Restore active room from localStorage on page refresh
+    useEffect(() => {
+        try {
+            const savedRoomId = localStorage.getItem('active_room_id')
+            const savedRoomName = localStorage.getItem('active_room_name')
+            if (savedRoomId) {
+                setActiveRoomId(savedRoomId)
+                if (savedRoomName) {
+                    setActiveRoomName(savedRoomName)
+                }
+            }
+        } catch {
+            // Ignore localStorage errors
+        }
+    }, [])
+
+    const handleSelectRoom = (id: string, name?: string) => {
+        setActiveRoomId(id)
+        const displayName = name || `Room #${id}`
+        setActiveRoomName(displayName)
+        try {
+            localStorage.setItem('active_room_id', id)
+            localStorage.setItem('active_room_name', displayName)
+        } catch {
+            // Ignore localStorage errors
+        }
+    }
 
     if (isLoading) {
         return (
@@ -60,10 +88,7 @@ export default function Home() {
                 <main className="flex-1 flex overflow-hidden">
                     <RoomSidebar
                         activeRoomId={activeRoomId}
-                        onSelectRoom={(id) => {
-                            setActiveRoomId(id)
-                            setActiveRoomName(`Room #${id}`)
-                        }}
+                        onSelectRoom={handleSelectRoom}
                     />
 
                     <ChatBox

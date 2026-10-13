@@ -5,6 +5,7 @@ import React, { useState, createContext, useEffect, useContext } from 'react'
 export type UserInfo = {
     username: string
     id: string
+    accessToken?: string
 }
 
 interface AuthContextType {
@@ -59,6 +60,8 @@ const AuthContextProvider = ({ children }: { children: React.ReactNode }) => {
         } finally {
             setUser(null)
             localStorage.removeItem('user_info')
+            localStorage.removeItem('active_room_id')
+            localStorage.removeItem('active_room_name')
         }
     }
 
