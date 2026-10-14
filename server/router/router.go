@@ -13,10 +13,9 @@ import (
 
 var r *gin.Engine
 
-var frontendURL = os.Getenv("FRONTEND_URL")
-
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
+	frontendURL := os.Getenv("FRONTEND_URL")
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
