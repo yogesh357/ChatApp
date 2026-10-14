@@ -13,12 +13,14 @@ import (
 
 var r *gin.Engine
 
+var frontendURL = os.Getenv("FRONTEND_URL")
+
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
-			os.Getenv("FRONTEND_URL"),"http://localhost:3000",
+			frontendURL, "http://localhost:3000",
 		},
 		AllowMethods: []string{
 			"GET",
