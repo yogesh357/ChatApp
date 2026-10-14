@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/yogesh/chat/db"
@@ -34,5 +35,10 @@ func main() {
 	go hub.Run()
 
 	router.InitRouter(userHandler, wsHandler)
-	router.Start(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	router.Start(":" + port)
 }
