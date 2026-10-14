@@ -71,7 +71,7 @@ export function useChatSocket(
             return;
         }
 
-        const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
+        const wsBase = process.env.NEXT_PUBLIC_API_URL!
         const tokenParam = user.accessToken ? `?token=${encodeURIComponent(user.accessToken)}` : "";
         const wsUrl = `${wsBase}/ws/joinRoom/${encodeURIComponent(roomId)}${tokenParam}`;
 

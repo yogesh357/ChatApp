@@ -1,6 +1,10 @@
 package router
 
 import (
+	"os"
+	"time"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/yogesh/chat/internal/user"
 	"github.com/yogesh/chat/internal/ws"
@@ -11,6 +15,31 @@ var r *gin.Engine
 
 func InitRouter(userHandler *user.Handler, wsHandler *ws.Handler) {
 	r = gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{
+			os.Getenv("FRONTEND_URL"),"http://localhost:3000",
+		},
+		AllowMethods: []string{
+			"GET",
+			"POST",
+			"PUT",
+			"PATCH",
+			"DELETE",
+			"OPTIONS",
+		},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Authorization",
+		},
+		ExposeHeaders: []string{
+			"Content-Length",
+		},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{

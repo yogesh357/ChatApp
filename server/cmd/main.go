@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/joho/godotenv"
 	"github.com/yogesh/chat/db"
 	"github.com/yogesh/chat/internal/user"
 	"github.com/yogesh/chat/internal/ws"
@@ -10,6 +11,8 @@ import (
 )
 
 func main() {
+	_ = godotenv.Load()
+
 	dbConn, err := db.NewDatabase()
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
